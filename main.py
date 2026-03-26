@@ -5,8 +5,8 @@ import os
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from games.chess import logic
-from shared.redis_client import get_redis
+import logic
+from redis_client import get_redis
 
 app = FastAPI(title="mimigames-chess", version="0.1.0")
 
