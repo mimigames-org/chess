@@ -5,8 +5,8 @@ WORKDIR /app
 RUN pip install uv --no-cache-dir
 
 # Install deps first (cached layer)
-COPY pyproject.toml ./
-RUN uv sync --no-dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 # Copy source
 COPY . .

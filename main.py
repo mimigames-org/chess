@@ -3,12 +3,14 @@
 import os
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import logic
-from redis_client import get_redis
 
 app = FastAPI(title="mimigames-chess", version="0.1.0")
+
+app.mount("/ui", StaticFiles(directory="ui", html=True), name="ui")
 
 MIMI_SECRET = os.getenv("MIMI_SECRET", "dev-mimi-secret")
 
@@ -32,10 +34,18 @@ class ActionRequest(BaseModel):
     player_id: str
     action: str
     payload: dict = {}
+    state: dict
 
 
 class TickRequest(BaseModel):
     room_id: str
+    state: dict
+
+
+class ViewRequest(BaseModel):
+    room_id: str
+    player_id: str
+    state: dict
 
 
 # --- Endpoints ---
@@ -49,19 +59,16 @@ async def health():
 @app.post("/start")
 async def start(body: StartRequest, x_mimi_secret: str = Header(...)):
     _auth(x_mimi_secret)
-    r = get_redis()
     try:
-        result = await logic.start_game(r, body.room_id, body.players)
+        return logic.start_game(body.players)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return result
 
 
 @app.post("/action")
 async def action(body: ActionRequest, x_mimi_secret: str = Header(...)):
     _auth(x_mimi_secret)
-    r = get_redis()
-    result = await logic.handle_action(r, body.room_id, body.player_id, body.action, body.payload)
+    result = logic.handle_action(body.state, body.player_id, body.action, body.payload)
     if result is None:
         raise HTTPException(status_code=400, detail="Invalid action")
     return result
@@ -73,11 +80,7 @@ async def tick(body: TickRequest, x_mimi_secret: str = Header(...)):
     return None
 
 
-@app.get("/state/{room_id}")
-async def state(room_id: str, player_id: str = "", x_mimi_secret: str = Header(...)):
+@app.post("/view")
+async def view(body: ViewRequest, x_mimi_secret: str = Header(...)):
     _auth(x_mimi_secret)
-    r = get_redis()
-    result = await logic.get_state(r, room_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Game not found")
-    return result
+    return logic.get_view(body.state, body.player_id)

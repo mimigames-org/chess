@@ -1,23 +1,16 @@
-"""Chess game logic. Stateless functions operating on Redis state."""
+"""Chess game logic — pure functions, no external dependencies."""
 
-import json
 from typing import Any
 
 import chess
 
 
-def _key(room_id: str) -> str:
-    return f"chess:{room_id}"
-
-
 def _piece_code(piece: chess.Piece) -> str:
-    """Convert piece to 'wP', 'bK' etc."""
     color = "w" if piece.color == chess.WHITE else "b"
     return color + piece.symbol().upper()
 
 
 def _full_board(board: chess.Board) -> dict[str, str | None]:
-    """Return all 64 squares with piece codes or null."""
     result: dict[str, str | None] = {}
     for sq in chess.SQUARES:
         piece = board.piece_at(sq)
@@ -26,7 +19,6 @@ def _full_board(board: chess.Board) -> dict[str, str | None]:
 
 
 def _board_delta(old: chess.Board, new: chess.Board) -> dict[str, str | None]:
-    """Return only squares that changed between two board states."""
     delta: dict[str, str | None] = {}
     for sq in chess.SQUARES:
         old_piece = old.piece_at(sq)
@@ -50,8 +42,19 @@ def _turn(board: chess.Board) -> str:
     return "white" if board.turn == chess.WHITE else "black"
 
 
-async def start_game(r: Any, room_id: str, players: list[dict[str, Any]]) -> dict[str, Any]:
-    """Initialise a new chess game. First player is white."""
+def _public_snapshot(board: chess.Board, state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "board": _full_board(board),
+        "fen": board.fen(),
+        "turn": _turn(board),
+        "status": _status(board),
+        "white_player": state["white"],
+        "black_player": state["black"],
+    }
+
+
+def start_game(players: list[dict[str, Any]]) -> dict[str, Any]:
+    """Initialise a new chess game. Returns {state, public_delta, private_deltas, events}."""
     if len(players) < 2:
         raise ValueError("Chess requires at least 2 players")
 
@@ -60,25 +63,17 @@ async def start_game(r: Any, room_id: str, players: list[dict[str, Any]]) -> dic
 
     board = chess.Board()
     state = {"fen": board.fen(), "white": white_id, "black": black_id}
-    await r.set(_key(room_id), json.dumps(state))
 
     return {
-        "public_delta": {
-            "board": _full_board(board),
-            "fen": board.fen(),
-            "turn": "white",
-            "status": "active",
-            "white_player": white_id,
-            "black_player": black_id,
-        },
+        "state": state,
+        "public_delta": _public_snapshot(board, state),
         "private_deltas": {},
         "events": [],
     }
 
 
-async def handle_action(
-    r: Any,
-    room_id: str,
+def handle_action(
+    state: dict[str, Any],
     player_id: str,
     action: str,
     payload: dict[str, Any],
@@ -87,11 +82,6 @@ async def handle_action(
     if action != "move":
         return None
 
-    raw = await r.get(_key(room_id))
-    if not raw:
-        return None
-
-    state = json.loads(raw)
     board = chess.Board(state["fen"])
 
     from_sq = payload.get("from", "")
@@ -99,13 +89,11 @@ async def handle_action(
     if not from_sq or not to_sq:
         return None
 
-    # Validate it's this player's turn
     if board.turn == chess.WHITE and player_id != state["white"]:
         return None
     if board.turn == chess.BLACK and player_id != state["black"]:
         return None
 
-    # Parse move (auto-promote to queen)
     try:
         from_int = chess.parse_square(from_sq)
         to_int = chess.parse_square(to_sq)
@@ -123,10 +111,10 @@ async def handle_action(
     board.push(move)
 
     new_status = _status(board)
-    state["fen"] = board.fen()
-    await r.set(_key(room_id), json.dumps(state))
+    new_state = {**state, "fen": board.fen()}
 
     response: dict[str, Any] = {
+        "state": new_state,
         "public_delta": {
             "board": _board_delta(old_board, board),
             "fen": board.fen(),
@@ -139,40 +127,19 @@ async def handle_action(
     }
 
     if new_status in ("checkmate", "stalemate"):
-        winner: str
         if new_status == "checkmate":
-            # The side whose turn it is now lost (they're in checkmate)
             winner = "white" if board.turn == chess.BLACK else "black"
         else:
             winner = "draw"
-        response["events"].append(
-            {
-                "type": "game_over",
-                "payload": {"winner": winner, "reason": new_status},
-            }
-        )
+        response["events"].append({"type": "game_over", "payload": {"winner": winner, "reason": new_status}})
 
     return response
 
 
-async def get_state(r: Any, room_id: str) -> dict[str, Any] | None:
-    """Return full public state for reconnect / spectators."""
-    raw = await r.get(_key(room_id))
-    if not raw:
-        return None
-
-    state = json.loads(raw)
+def get_view(state: dict[str, Any], player_id: str) -> dict[str, Any]:
+    """Return player-specific snapshot from full state."""
     board = chess.Board(state["fen"])
-
     return {
-        "board": _full_board(board),
-        "fen": board.fen(),
-        "turn": _turn(board),
-        "status": _status(board),
-        "white_player": state["white"],
-        "black_player": state["black"],
+        "public_state": _public_snapshot(board, state),
+        "private_state": {},
     }
-
-
-async def cleanup(r: Any, room_id: str) -> None:
-    await r.delete(_key(room_id))
