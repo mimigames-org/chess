@@ -10,6 +10,8 @@ services:
       SELF_BACKEND_URL: ${SELF_BACKEND_URL:-}
       SELF_FRONTEND_URL: ${SELF_FRONTEND_URL:-}
       SELF_NAME: ${SELF_NAME:-Шахматы}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
       - /app/.venv
