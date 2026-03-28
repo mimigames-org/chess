@@ -50,6 +50,8 @@ def _public_snapshot(board: chess.Board, state: dict[str, Any]) -> dict[str, Any
         "status": _status(board),
         "white_player": state["white"],
         "black_player": state["black"],
+        "white_name": state.get("white_name", "Белые"),
+        "black_name": state.get("black_name", "Чёрные"),
     }
 
 
@@ -62,7 +64,13 @@ def start_game(players: list[dict[str, Any]]) -> dict[str, Any]:
     black_id = players[1]["id"]
 
     board = chess.Board()
-    state = {"fen": board.fen(), "white": white_id, "black": black_id}
+    state = {
+        "fen": board.fen(),
+        "white": white_id,
+        "black": black_id,
+        "white_name": players[0].get("name", "Белые"),
+        "black_name": players[1].get("name", "Чёрные"),
+    }
 
     return {
         "state": state,
@@ -99,7 +107,8 @@ def handle_action(
         to_int = chess.parse_square(to_sq)
         promotion = None
         if board.piece_type_at(from_int) == chess.PAWN and chess.square_rank(to_int) in (0, 7):
-            promotion = chess.QUEEN
+            promo_map = {"q": chess.QUEEN, "r": chess.ROOK, "b": chess.BISHOP, "n": chess.KNIGHT}
+            promotion = promo_map.get(str(payload.get("promotion", "q")).lower(), chess.QUEEN)
         move = chess.Move(from_int, to_int, promotion=promotion)
     except (ValueError, chess.InvalidMoveError):
         return None
