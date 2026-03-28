@@ -10,8 +10,6 @@ services:
       SELF_BACKEND_URL: ${SELF_BACKEND_URL:-}
       SELF_FRONTEND_URL: ${SELF_FRONTEND_URL:-}
       SELF_NAME: ${SELF_NAME:-Шахматы}
-    env_file:
-      - ../../.env
     volumes:
       - .:/app
       - /app/.venv
