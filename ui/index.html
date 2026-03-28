@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Шахматы</title>
-  <!-- chess.js for client-side legal move calculation -->
   <script src="./chess.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,20 +16,84 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
-      gap: 16px;
-      padding: 16px;
+      height: 100vh;
+      gap: 5px;
+      padding: 8px;
+      overflow: hidden;
     }
 
+    /* ── Player panels ─────────────────────────────────────────────────── */
+    .player-panel {
+      width: min(100vw - 16px, 100vh - 150px, 700px);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      border: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .player-panel.active-turn {
+      border-color: rgba(91,91,214,0.5);
+    }
+    .color-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .color-dot.white { background: #fff; border: 1px solid #666; }
+    .color-dot.black { background: #222; border: 1px solid #888; }
+    .player-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 160px;
+      color: #ccc;
+    }
+    .player-name.me { color: #e8e8f0; }
+    .captured-pieces {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1px;
+      align-items: center;
+      font-size: clamp(11px, 2vmin, 16px);
+      line-height: 1;
+      min-width: 0;
+    }
+    .cap-piece-w {
+      color: #fff;
+      text-shadow: 0 0 1px #000, 1px 1px 0 #000, -1px -1px 0 #000;
+    }
+    .cap-piece-b {
+      color: #1a1a1a;
+      text-shadow: 0 0 1px rgba(255,255,255,.6), 1px 1px 0 rgba(255,255,255,.4), -1px -1px 0 rgba(255,255,255,.4);
+    }
+    .score-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #8b8bf0;
+      background: rgba(91,91,214,0.15);
+      border-radius: 4px;
+      padding: 1px 5px;
+      flex-shrink: 0;
+    }
+
+    /* ── Status bar ────────────────────────────────────────────────────── */
     #status-bar {
-      font-size: 1rem;
-      color: #aaa;
+      font-size: 0.8rem;
+      color: #888;
       text-align: center;
-      min-height: 1.5em;
+      min-height: 1.2em;
     }
-    #status-bar .highlight { color: #5b5bd6; font-weight: 700; }
-    #status-bar .check { color: #e05; font-weight: 700; }
+    #status-bar .hl { color: #8b8bf0; font-weight: 700; }
+    #status-bar .chk { color: #e05; font-weight: 700; }
 
+    /* ── Board ─────────────────────────────────────────────────────────── */
     #board-wrap {
       position: relative;
       user-select: none;
@@ -39,9 +102,10 @@
     #board {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
-      border: 2px solid #333;
-      width: min(80vw, 80vh, 480px);
-      height: min(80vw, 80vh, 480px);
+      grid-template-rows: repeat(8, 1fr);
+      border: 2px solid #2a2a40;
+      width: min(100vw - 16px, 100vh - 150px, 700px);
+      height: min(100vw - 16px, 100vh - 150px, 700px);
     }
 
     .sq {
@@ -49,7 +113,7 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      font-size: clamp(20px, 6vw, 48px);
+      font-size: clamp(14px, 7vmin, 58px);
       position: relative;
       transition: background 0.1s;
     }
@@ -68,194 +132,307 @@
       content: '';
       position: absolute;
       inset: 0;
-      border-radius: 0;
       background: transparent;
       box-shadow: inset 0 0 0 4px rgba(0,0,0,0.25);
     }
-    .sq.last-move { background: rgba(155, 199, 0, 0.41) !important; }
+    .sq.last-move { background: rgba(155,199,0,0.41) !important; }
 
     .rank-label {
       position: absolute;
-      left: 2px;
-      top: 2px;
-      font-size: 0.6em;
+      left: 2px; top: 2px;
+      font-size: 0.55em;
       opacity: 0.6;
       pointer-events: none;
     }
     .file-label {
       position: absolute;
-      right: 2px;
-      bottom: 2px;
-      font-size: 0.6em;
+      right: 2px; bottom: 2px;
+      font-size: 0.55em;
       opacity: 0.6;
       pointer-events: none;
     }
 
-    #player-info {
+    .piece {
+      line-height: 1;
+      pointer-events: none;
+    }
+    .piece-white {
+      color: #fff;
+      text-shadow:
+        1px 1px 0 #000, -1px -1px 0 #000,
+        1px -1px 0 #000, -1px  1px 0 #000,
+        0 2px 4px rgba(0,0,0,.6);
+    }
+    .piece-black {
+      color: #1a1a1a;
+      text-shadow:
+        1px 1px 0 rgba(255,255,255,.5), -1px -1px 0 rgba(255,255,255,.5),
+        1px -1px 0 rgba(255,255,255,.5), -1px  1px 0 rgba(255,255,255,.5);
+    }
+
+    /* ── Promotion picker ──────────────────────────────────────────────── */
+    #promotion-picker {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #12122a;
+      border: 2px solid #5b5bd6;
+      border-radius: 12px;
+      padding: 12px;
       display: flex;
-      gap: 24px;
-      font-size: 0.9rem;
-      color: #888;
+      gap: 6px;
+      z-index: 10;
+      box-shadow: 0 8px 32px rgba(0,0,0,.6);
     }
-    .color-dot {
-      display: inline-block;
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      margin-right: 4px;
-      vertical-align: middle;
+    #promotion-picker.hidden { display: none; }
+    .promo-btn {
+      width: 64px;
+      height: 64px;
+      font-size: 38px;
+      background: rgba(255,255,255,.06);
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      transition: border-color .15s, background .15s;
     }
-    .color-dot.white { background: #fff; border: 1px solid #666; }
-    .color-dot.black { background: #333; border: 1px solid #999; }
-    .my-turn { color: #5b5bd6; font-weight: 600; }
+    .promo-btn:hover { border-color: #5b5bd6; background: rgba(91,91,214,.2); }
   </style>
 </head>
 <body>
-  <div id="player-info"></div>
+  <div id="top-player" class="player-panel"></div>
   <div id="status-bar">Ожидание...</div>
   <div id="board-wrap">
     <div id="board"></div>
+    <div id="promotion-picker" class="hidden"></div>
   </div>
+  <div id="bottom-player" class="player-panel"></div>
 
   <script type="module">
     import MimiSDK from './sdk.js';
 
     // ── State ────────────────────────────────────────────────────────────────
 
-    let myId = null;
-    let myColor = null;     // 'white' | 'black' | null (spectator)
-    let gameState = null;   // { board, fen, turn, status, white_player, black_player }
-    let chessJs = null;     // chess.js instance (for legal move highlighting)
-    let selected = null;    // currently selected square name
-    let legalTargets = [];  // target squares for selected piece
-    let lastMove = null;    // { from, to }
+    let myId       = null;
+    let myColor    = null;   // 'white' | 'black' | null
+    let gameState  = null;
+    let chessJs    = null;
+    let selected   = null;
+    let legalTargets  = [];
+    let lastMove      = null;
+    let boardFlipped  = false;
+    let pendingPromotion = null; // { from, to }
 
-    // ── Unicode pieces ────────────────────────────────────────────────────────
+    // ── Pieces ───────────────────────────────────────────────────────────────
 
     const PIECES = {
-      wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙',
-      bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟',
+      wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+      bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟',
     };
+    const PIECE_VALUES  = { P:1, N:3, B:3, R:5, Q:9 };
+    const START_COUNTS  = { P:8, N:2, B:2, R:2, Q:1 };
 
-    // ── Board rendering ───────────────────────────────────────────────────────
+    // ── Board building ───────────────────────────────────────────────────────
 
-    function buildBoard() {
-      const boardEl = document.getElementById('board');
-      boardEl.innerHTML = '';
-      // Render from rank 8 down to 1 (standard orientation)
-      for (let rank = 7; rank >= 0; rank--) {
-        for (let file = 0; file < 8; file++) {
-          const sqName = 'abcdefgh'[file] + (rank + 1);
+    function makePieceSpan(code) {
+      const span = document.createElement('span');
+      span.className = 'piece ' + (code[0] === 'w' ? 'piece-white' : 'piece-black');
+      span.textContent = PIECES[code] ?? '?';
+      return span;
+    }
+
+    function buildBoard(flipped = false) {
+      boardFlipped = flipped;
+      const el = document.getElementById('board');
+      el.innerHTML = '';
+      for (let ri = 0; ri < 8; ri++) {
+        const rank = flipped ? ri : 7 - ri;
+        for (let fi = 0; fi < 8; fi++) {
+          const file = flipped ? 7 - fi : fi;
+          const sq = 'abcdefgh'[file] + (rank + 1);
           const cell = document.createElement('div');
           cell.className = 'sq ' + ((rank + file) % 2 === 0 ? 'dark' : 'light');
-          cell.dataset.sq = sqName;
-          if (file === 0) {
+          cell.dataset.sq = sq;
+          if (fi === 0) {
             const rl = document.createElement('span');
             rl.className = 'rank-label';
             rl.textContent = rank + 1;
             cell.appendChild(rl);
           }
-          if (rank === 0) {
+          if (ri === 7) {
             const fl = document.createElement('span');
             fl.className = 'file-label';
             fl.textContent = 'abcdefgh'[file];
             cell.appendChild(fl);
           }
-          cell.addEventListener('click', () => onSquareClick(sqName));
-          boardEl.appendChild(cell);
+          cell.addEventListener('click', () => onSquareClick(sq));
+          el.appendChild(cell);
         }
       }
     }
 
-    function renderPieces(boardMap) {
+    function renderPieces(board) {
       document.querySelectorAll('.sq').forEach(cell => {
-        const sq = cell.dataset.sq;
-        // Remove old piece span if any
-        const old = cell.querySelector('.piece');
-        if (old) old.remove();
-        const code = boardMap[sq];
-        if (code) {
-          const span = document.createElement('span');
-          span.className = 'piece';
-          span.textContent = PIECES[code] ?? '?';
-          cell.appendChild(span);
-        }
+        cell.querySelector('.piece')?.remove();
+        const code = board[cell.dataset.sq];
+        if (code) cell.appendChild(makePieceSpan(code));
       });
     }
 
     function applyDelta(delta) {
-      Object.entries(delta).forEach(([sq, code]) => {
+      for (const [sq, code] of Object.entries(delta)) {
         const cell = document.querySelector(`.sq[data-sq="${sq}"]`);
-        if (!cell) return;
-        const old = cell.querySelector('.piece');
-        if (old) old.remove();
-        if (code) {
-          const span = document.createElement('span');
-          span.className = 'piece';
-          span.textContent = PIECES[code] ?? '?';
-          cell.appendChild(span);
-        }
-      });
+        if (!cell) continue;
+        cell.querySelector('.piece')?.remove();
+        if (code) cell.appendChild(makePieceSpan(code));
+      }
     }
 
     function updateHighlights() {
       document.querySelectorAll('.sq').forEach(cell => {
         const sq = cell.dataset.sq;
         cell.classList.remove('selected', 'legal-move', 'legal-capture', 'last-move');
-        if (lastMove && (sq === lastMove.from || sq === lastMove.to)) {
+        if (lastMove && (sq === lastMove.from || sq === lastMove.to))
           cell.classList.add('last-move');
-        }
-        if (sq === selected) cell.classList.add('selected');
-        if (legalTargets.includes(sq)) {
-          // Check if there's a piece on this square (capture) or empty (move)
-          const code = gameState?.board?.[sq];
-          cell.classList.add(code ? 'legal-capture' : 'legal-move');
-        }
+        if (sq === selected)
+          cell.classList.add('selected');
+        if (legalTargets.includes(sq))
+          cell.classList.add(gameState?.board?.[sq] ? 'legal-capture' : 'legal-move');
       });
     }
 
+    // ── Status bar ───────────────────────────────────────────────────────────
+
     function updateStatus() {
       if (!gameState) return;
-      const bar = document.getElementById('status-bar');
       const { turn, status, white_player, black_player } = gameState;
-
       const isMyTurn = (turn === 'white' && myId === white_player) ||
                        (turn === 'black' && myId === black_player);
-
       let msg = '';
       if (status === 'checkmate') {
         const winner = turn === 'white' ? 'Чёрные' : 'Белые';
-        msg = `<span class="highlight">${winner} победили!</span> Мат.`;
+        msg = `<span class="hl">${winner} победили!</span> Мат.`;
       } else if (status === 'stalemate') {
-        msg = `<span class="highlight">Ничья!</span> Пат.`;
+        msg = `<span class="hl">Ничья!</span> Пат.`;
       } else if (status === 'check') {
-        msg = `<span class="check">Шах!</span> Ход: ${turn === 'white' ? 'Белые' : 'Чёрные'}`;
+        msg = `<span class="chk">Шах!</span> Ход: ${turn === 'white' ? 'Белые' : 'Чёрные'}`;
       } else {
-        const turnLabel = turn === 'white' ? 'Белые' : 'Чёрные';
-        msg = isMyTurn
-          ? `<span class="highlight">Ваш ход (${turnLabel})</span>`
-          : `Ход: ${turnLabel}`;
+        const label = turn === 'white' ? 'Белые' : 'Чёрные';
+        msg = isMyTurn ? `<span class="hl">Ваш ход (${label})</span>` : `Ход: ${label}`;
       }
-      bar.innerHTML = msg;
+      document.getElementById('status-bar').innerHTML = msg;
     }
 
-    function updatePlayerInfo() {
-      if (!gameState || !myId) return;
-      const { white_player, black_player } = gameState;
-      const info = document.getElementById('player-info');
-      const isWhite = myId === white_player;
-      const isBlack = myId === black_player;
+    // ── Material & captured pieces ────────────────────────────────────────────
 
-      if (!isWhite && !isBlack) {
-        info.innerHTML = '<span>Зритель</span>';
-        return;
+    function computeStats(board) {
+      const rem = { w:{P:0,N:0,B:0,R:0,Q:0}, b:{P:0,N:0,B:0,R:0,Q:0} };
+      for (const code of Object.values(board)) {
+        if (!code || code[1] === 'K') continue;
+        rem[code[0]][code[1]]++;
       }
-      info.innerHTML = `
-        <span class="${isWhite ? 'my-turn' : ''}">
-          <span class="color-dot white"></span>Белые
-        </span>
-        <span class="${isBlack ? 'my-turn' : ''}">
-          <span class="color-dot black"></span>Чёрные
-        </span>`;
+      let wMat = 0, bMat = 0;
+      for (const [t, v] of Object.entries(PIECE_VALUES)) {
+        wMat += rem.w[t] * v;
+        bMat += rem.b[t] * v;
+      }
+      const cap = {
+        w: Object.fromEntries(
+          Object.entries(START_COUNTS).map(([t, n]) => [t, n - rem.w[t]]).filter(([,n]) => n > 0)
+        ),
+        b: Object.fromEntries(
+          Object.entries(START_COUNTS).map(([t, n]) => [t, n - rem.b[t]]).filter(([,n]) => n > 0)
+        ),
+      };
+      return { cap, advantage: wMat - bMat };
+    }
+
+    function capturedHtml(capMap, color) {
+      // capMap: pieces of `color` that were taken; color = 'w' | 'b'
+      const cls = color === 'w' ? 'cap-piece-w' : 'cap-piece-b';
+      let html = '';
+      for (const t of ['Q','R','B','N','P']) {
+        const n = capMap[t] ?? 0;
+        if (n > 0) html += `<span class="${cls}">${(PIECES[color+t] ?? '?').repeat(n)}</span>`;
+      }
+      return html;
+    }
+
+    function updatePlayerPanels() {
+      if (!gameState) return;
+      const { turn, status, white_player, black_player } = gameState;
+      const whiteName = gameState.white_name ?? 'Белые';
+      const blackName = gameState.black_name ?? 'Чёрные';
+
+      const ended = status === 'checkmate' || status === 'stalemate';
+      const whiteActive = !ended && turn === 'white';
+      const blackActive = !ended && turn === 'black';
+
+      const { cap, advantage } = computeStats(gameState.board);
+
+      function renderPanel(panelId, color, name, isActive) {
+        const oppColor   = color === 'w' ? 'b' : 'w';
+        const capByThis  = cap[oppColor];           // opponent pieces this side captured
+        const scoreAdv   = color === 'w' ? advantage : -advantage;
+        const isMe       = (color === 'w' && myId === white_player) ||
+                           (color === 'b' && myId === black_player);
+
+        const panel = document.getElementById(panelId);
+        panel.className = 'player-panel' + (isActive ? ' active-turn' : '');
+        panel.innerHTML = `
+          <span class="color-dot ${color === 'w' ? 'white' : 'black'}"></span>
+          <span class="player-name${isMe ? ' me' : ''}">${name}${isMe ? ' (вы)' : ''}</span>
+          <span class="captured-pieces">${capturedHtml(capByThis, oppColor)}</span>
+          ${scoreAdv > 0 ? `<span class="score-badge">+${scoreAdv}</span>` : ''}
+        `;
+      }
+
+      // top = opponent, bottom = me (or black/white when not flipped)
+      const topColor  = boardFlipped ? 'w' : 'b';
+      const botColor  = boardFlipped ? 'b' : 'w';
+      const topName   = boardFlipped ? whiteName : blackName;
+      const botName   = boardFlipped ? blackName : whiteName;
+      const topActive = boardFlipped ? whiteActive : blackActive;
+      const botActive = boardFlipped ? blackActive : whiteActive;
+
+      renderPanel('top-player',    topColor, topName, topActive);
+      renderPanel('bottom-player', botColor, botName, botActive);
+    }
+
+    // ── Promotion picker ──────────────────────────────────────────────────────
+
+    function isPromotionMove(from, to) {
+      if (!chessJs) return false;
+      return chessJs.moves({ square: from, verbose: true }).some(m => m.to === to && m.promotion);
+    }
+
+    function showPromotionPicker() {
+      const picker = document.getElementById('promotion-picker');
+      picker.innerHTML = '';
+      const color = myColor === 'black' ? 'b' : 'w';
+      for (const t of ['Q','R','B','N']) {
+        const btn = document.createElement('button');
+        btn.className = 'promo-btn ' + (color === 'w' ? 'piece-white' : 'piece-black');
+        btn.title = t;
+        btn.textContent = PIECES[color + t];
+        btn.addEventListener('click', () => onPromotionChoice(t.toLowerCase()));
+        picker.appendChild(btn);
+      }
+      picker.classList.remove('hidden');
+    }
+
+    function onPromotionChoice(piece) {
+      document.getElementById('promotion-picker').classList.add('hidden');
+      if (pendingPromotion) {
+        MimiSDK.sendAction('move', { ...pendingPromotion, promotion: piece });
+        pendingPromotion = null;
+      }
+      selected = null; legalTargets = [];
+      updateHighlights();
     }
 
     // ── Click handling ────────────────────────────────────────────────────────
@@ -264,23 +441,16 @@
       if (!gameState || !myId) return false;
       const code = gameState.board[sq];
       if (!code) return false;
-      const colorChar = code[0];
-      const isWhitePiece = colorChar === 'w';
-      const amWhite = myId === gameState.white_player;
-      const amBlack = myId === gameState.black_player;
-      if (isWhitePiece && amWhite && gameState.turn === 'white') return true;
-      if (!isWhitePiece && amBlack && gameState.turn === 'black') return true;
+      const white = code[0] === 'w';
+      if (white  && myId === gameState.white_player && gameState.turn === 'white') return true;
+      if (!white && myId === gameState.black_player && gameState.turn === 'black') return true;
       return false;
     }
 
     function getLegalTargets(sq) {
       if (!chessJs) return [];
-      try {
-        const moves = chessJs.moves({ square: sq, verbose: true });
-        return moves.map(m => m.to);
-      } catch {
-        return [];
-      }
+      try { return chessJs.moves({ square: sq, verbose: true }).map(m => m.to); }
+      catch { return []; }
     }
 
     function onSquareClick(sq) {
@@ -288,16 +458,18 @@
 
       if (selected) {
         if (legalTargets.includes(sq)) {
-          // Make the move
+          if (isPromotionMove(selected, sq)) {
+            pendingPromotion = { from: selected, to: sq };
+            showPromotionPicker();
+            return;
+          }
           MimiSDK.sendAction('move', { from: selected, to: sq });
-          selected = null;
-          legalTargets = [];
+          selected = null; legalTargets = [];
           updateHighlights();
           return;
         }
         if (sq === selected) {
-          selected = null;
-          legalTargets = [];
+          selected = null; legalTargets = [];
           updateHighlights();
           return;
         }
@@ -308,72 +480,62 @@
         legalTargets = getLegalTargets(sq);
         updateHighlights();
       } else {
-        selected = null;
-        legalTargets = [];
+        selected = null; legalTargets = [];
         updateHighlights();
       }
     }
 
-    // ── SDK callbacks ─────────────────────────────────────────────────────────
+    // ── SDK ───────────────────────────────────────────────────────────────────
 
     MimiSDK.onPlayerInfo((player) => {
       myId = player.id;
-      myColor = player.role === 'spectator' ? null : myColor;
-      updatePlayerInfo();
+      updatePlayerPanels();
     });
 
     MimiSDK.onStateUpdate(({ delta, snapshot }) => {
       if (snapshot) {
-        // Full state on connect / reconnect
         gameState = {
-          board: snapshot.board ?? {},
-          fen: snapshot.fen ?? null,
-          turn: snapshot.turn ?? 'white',
-          status: snapshot.status ?? 'active',
+          board:        snapshot.board        ?? {},
+          fen:          snapshot.fen          ?? null,
+          turn:         snapshot.turn         ?? 'white',
+          status:       snapshot.status       ?? 'active',
           white_player: snapshot.white_player ?? null,
           black_player: snapshot.black_player ?? null,
+          white_name:   snapshot.white_name   ?? null,
+          black_name:   snapshot.black_name   ?? null,
         };
-        if (gameState.fen) {
-          chessJs = new Chess(gameState.fen);
-        }
-        renderPieces(gameState.board);
-        selected = null;
-        legalTargets = [];
-        lastMove = null;
-      } else if (delta) {
-        // Incremental update
-        if (!gameState) return;
-        // Update board map
-        Object.assign(gameState.board, delta.board ?? {});
-        if (delta.fen) {
-          gameState.fen = delta.fen;
-          chessJs = new Chess(gameState.fen);
-        }
-        if (delta.turn) gameState.turn = delta.turn;
-        if (delta.status) gameState.status = delta.status;
-        if (delta.last_move) lastMove = delta.last_move;
-        applyDelta(delta.board ?? {});
-        selected = null;
-        legalTargets = [];
-      }
+        if (gameState.fen) chessJs = new Chess(gameState.fen);
+        selected = null; legalTargets = []; lastMove = null;
 
-      if (gameState) {
         myColor = myId === gameState.white_player ? 'white'
                 : myId === gameState.black_player ? 'black'
                 : null;
+        const flip = myColor === 'black';
+        if (flip !== boardFlipped) buildBoard(flip);
+        renderPieces(gameState.board);
+      } else if (delta) {
+        if (!gameState) return;
+        Object.assign(gameState.board, delta.board ?? {});
+        if (delta.fen)        { gameState.fen = delta.fen; chessJs = new Chess(delta.fen); }
+        if (delta.turn)       gameState.turn   = delta.turn;
+        if (delta.status)     gameState.status = delta.status;
+        if (delta.last_move)  lastMove         = delta.last_move;
+        if (delta.white_name) gameState.white_name = delta.white_name;
+        if (delta.black_name) gameState.black_name = delta.black_name;
+        applyDelta(delta.board ?? {});
+        selected = null; legalTargets = [];
       }
+
       updateHighlights();
       updateStatus();
-      updatePlayerInfo();
+      updatePlayerPanels();
     });
 
     MimiSDK.onGameEvent((event) => {
-      if (event.type === 'game_over') {
-        updateStatus();
-      }
+      if (event.type === 'game_over') updateStatus();
     });
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+    // ── Init ─────────────────────────────────────────────────────────────────
 
     buildBoard();
     MimiSDK.ready();
