@@ -1,18 +1,57 @@
 """Chess game microservice — implements the MimiGames game backend contract."""
 
+import asyncio
+import logging
 import os
+from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import logic
 
-app = FastAPI(title="mimigames-chess", version="0.1.0")
-
-app.mount("/ui", StaticFiles(directory="ui", html=True), name="ui")
+logger = logging.getLogger(__name__)
 
 MIMI_SECRET = os.getenv("MIMI_SECRET", "dev-mimi-secret")
+CORE_URL = os.getenv("CORE_URL", "").rstrip("/")
+SELF_BACKEND_URL = os.getenv("SELF_BACKEND_URL", "").rstrip("/")
+SELF_FRONTEND_URL = os.getenv("SELF_FRONTEND_URL", "")
+SELF_NAME = os.getenv("SELF_NAME", "Шахматы")
+
+
+async def _register_self() -> None:
+    if not CORE_URL or not SELF_BACKEND_URL or not SELF_FRONTEND_URL:
+        return
+    payload = {
+        "name": SELF_NAME,
+        "backend_url": SELF_BACKEND_URL,
+        "frontend_url": SELF_FRONTEND_URL,
+        "api_key": MIMI_SECRET,
+    }
+    for attempt in range(1, 6):
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.post(f"{CORE_URL}/games", json=payload)
+                resp.raise_for_status()
+            logger.info("Registered with core at %s", CORE_URL)
+            return
+        except Exception as e:
+            logger.warning("Registration attempt %d failed: %s", attempt, e)
+            await asyncio.sleep(attempt * 2)
+    logger.error("Failed to register with core after 5 attempts")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(_register_self())
+    yield
+
+
+app = FastAPI(title="mimigames-chess", version="0.1.0", lifespan=lifespan)
+
+app.mount("/ui", StaticFiles(directory="ui", html=True), name="ui")
 
 
 def _auth(x_mimi_secret: str = Header(...)) -> None:

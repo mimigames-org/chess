@@ -6,6 +6,10 @@ services:
       - "8001:8001"
     environment:
       MIMI_SECRET: ${MIMI_SECRET:-dev-mimi-secret}
+      CORE_URL: ${CORE_URL:-}
+      SELF_BACKEND_URL: ${SELF_BACKEND_URL:-}
+      SELF_FRONTEND_URL: ${SELF_FRONTEND_URL:-}
+      SELF_NAME: ${SELF_NAME:-Шахматы}
     volumes:
       - .:/app
       - /app/.venv
