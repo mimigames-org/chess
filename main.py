@@ -78,7 +78,6 @@ class ActionRequest(BaseModel):
 
 class TickRequest(BaseModel):
     room_id: str
-    state: dict
 
 
 class ViewRequest(BaseModel):
