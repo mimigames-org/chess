@@ -10,7 +10,7 @@
 
     body {
       font-family: system-ui, sans-serif;
-      background: #1a1a2e;
+      background: #0f0f1a;
       color: #e8e8f0;
       display: flex;
       flex-direction: column;
@@ -30,13 +30,13 @@
       gap: 8px;
       min-height: 42px;
       padding: 4px 10px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 8px;
-      border: 1px solid transparent;
+      background: rgba(255,255,255,0.04);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
       transition: border-color 0.2s;
     }
     .player-panel.active-turn {
-      border-color: rgba(91,91,214,0.5);
+      border-color: rgba(13,148,136,0.6);
     }
     .color-dot {
       width: 12px; height: 12px;
@@ -52,9 +52,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 160px;
-      color: #ccc;
+      color: rgba(255,255,255,0.6);
     }
-    .player-name.me { color: #e8e8f0; }
+    .player-name.me { color: #fff; }
     .captured-pieces {
       flex: 1;
       display: flex;
@@ -76,8 +76,8 @@
     .score-badge {
       font-size: 0.75rem;
       font-weight: 700;
-      color: #8b8bf0;
-      background: rgba(91,91,214,0.15);
+      color: #0d9488;
+      background: rgba(13,148,136,0.12);
       border-radius: 4px;
       padding: 1px 5px;
       flex-shrink: 0;
@@ -86,12 +86,12 @@
     /* ── Status bar ────────────────────────────────────────────────────── */
     #status-bar {
       font-size: 0.8rem;
-      color: #888;
+      color: rgba(255,255,255,0.3);
       text-align: center;
       min-height: 1.2em;
     }
-    #status-bar .hl { color: #8b8bf0; font-weight: 700; }
-    #status-bar .chk { color: #e05; font-weight: 700; }
+    #status-bar .hl { color: #7c3aed; font-weight: 700; }
+    #status-bar .chk { color: #ff5454; font-weight: 700; }
 
     /* ── Board ─────────────────────────────────────────────────────────── */
     #board-wrap {
@@ -103,7 +103,7 @@
       display: grid;
       grid-template-columns: repeat(8, 1fr);
       grid-template-rows: repeat(8, 1fr);
-      border: 2px solid #2a2a40;
+      border: 2px solid rgba(255,255,255,0.08);
       width: min(100vw - 16px, 100vh - 150px, 700px);
       height: min(100vw - 16px, 100vh - 150px, 700px);
     }
@@ -176,8 +176,8 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: #12122a;
-      border: 2px solid #5b5bd6;
+      background: #0f0f1a;
+      border: 2px solid #7c3aed;
       border-radius: 12px;
       padding: 12px;
       display: flex;
@@ -200,7 +200,7 @@
       line-height: 1;
       transition: border-color .15s, background .15s;
     }
-    .promo-btn:hover { border-color: #5b5bd6; background: rgba(91,91,214,.2); }
+    .promo-btn:hover { border-color: #7c3aed; background: rgba(124,58,237,0.15); }
   </style>
 </head>
 <body>
