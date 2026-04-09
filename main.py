@@ -30,7 +30,7 @@ async def _register_self() -> None:
         "frontend_url": SELF_FRONTEND_URL,
         "api_key": MIMI_SECRET,
     }
-    for attempt in range(1, 6):
+    while True:
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 resp = await client.post(f"{CORE_URL}/games", json=payload)
@@ -38,9 +38,8 @@ async def _register_self() -> None:
             logger.info("Registered with core at %s", CORE_URL)
             return
         except Exception as e:
-            logger.warning("Registration attempt %d failed: %s", attempt, e)
-            await asyncio.sleep(attempt * 2)
-    logger.error("Failed to register with core after 5 attempts")
+            logger.warning("Registration failed, retrying in 5s: %s", e)
+            await asyncio.sleep(5)
 
 
 @asynccontextmanager
