@@ -13,5 +13,5 @@ RUN uv sync --frozen --no-dev
 # Copy source
 COPY . .
 
-EXPOSE 8001
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+EXPOSE 8081
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8081"]
