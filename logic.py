@@ -1,8 +1,11 @@
 """Chess game logic — pure functions, no external dependencies."""
 
+import logging
 from typing import Any
 
 import chess
+
+logger = logging.getLogger(__name__)
 
 
 def _piece_code(piece: chess.Piece) -> str:
@@ -114,6 +117,8 @@ def handle_action(
         return None
 
     if move not in board.legal_moves:
+        room_id = state.get("room_id", "unknown")
+        logger.warning("illegal_move room_id=%s move=%s%s", room_id, from_sq, to_sq)
         return None
 
     old_board = board.copy()
@@ -140,6 +145,8 @@ def handle_action(
             winner = "white" if board.turn == chess.BLACK else "black"
         else:
             winner = "draw"
+        room_id = state.get("room_id", "unknown")
+        logger.info("game_over room_id=%s result=%s winner=%s", room_id, new_status, winner)
         response["events"].append({"type": "game_over", "payload": {"winner": winner, "reason": new_status}})
 
     return response
