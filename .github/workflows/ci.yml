@@ -1,23 +1,69 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
 jobs:
   lint:
+    name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v5
       - run: uv tool run ruff check .
-  test:
+
+  typecheck:
+    name: Type check (ty)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - run: uv sync
-      - run: uv run pytest
+      - run: uv tool run ty check .
+
+  audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv tool run pip-audit
+
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run pytest --cov --cov-report=xml --cov-fail-under=75
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+      - name: Check diff coverage (80% minimum)
+        if: github.event_name == 'pull_request'
+        run: |
+          uv run pip install diff-cover
+          uv run diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
 
   trigger-e2e:
     name: Trigger e2e tests
-    needs: [lint, test]
+    needs: [lint, typecheck, test, audit]
     if: github.ref == 'refs/heads/main' && success()
     runs-on: ubuntu-latest
     steps:
