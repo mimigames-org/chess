@@ -12,7 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv tool run ruff check .
+      - run: uv sync
+      - run: uv run ruff check .
 
   typecheck:
     name: Type check (ty)
@@ -23,7 +24,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
-      - run: uv tool run ty check .
+      - run: uv run ty check .
 
   audit:
     name: Dependency audit (pip-audit)
@@ -34,7 +35,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
-      - run: uv tool run pip-audit
+      - run: uv run pip-audit
 
   test:
     name: Tests (pytest)
@@ -57,9 +58,7 @@ jobs:
           retention-days: 30
       - name: Check diff coverage (80% minimum)
         if: github.event_name == 'pull_request'
-        run: |
-          uv run pip install diff-cover
-          uv run diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
+        run: uv run diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
 
   trigger-e2e:
     name: Trigger e2e tests

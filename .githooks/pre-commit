@@ -4,9 +4,9 @@ set -e
 
 REPO_NAME=$(basename "$PWD")
 echo "==> [$REPO_NAME] ruff check"
-uv tool run ruff check .
+uv run ruff check .
 
 echo "==> [$REPO_NAME] ty check"
-uv tool run ty check .
+uv run ty check .
 
 echo "==> pre-commit passed"
