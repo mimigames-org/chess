@@ -89,7 +89,13 @@ def handle_action(
     action: str,
     payload: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Process a move action. Returns None to signal a 400 response."""
+    """Process a game action. Returns None to signal a 400 response."""
+    if action == "player_disconnected":
+        return {"state": state, "public_delta": {}, "private_deltas": {}, "events": []}
+    if action == "set_host":
+        new_host = payload.get("new_host_id", "")
+        new_state = {**state, "host_id": new_host} if new_host else state
+        return {"state": new_state, "public_delta": {}, "private_deltas": {}, "events": []}
     if action != "move":
         return None
 
