@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -130,7 +131,7 @@ async def start(body: StartRequest, request: Request, x_mimi_secret: str = Heade
         return result
     except ValueError as e:
         logger.warning("game_error room_id=%s reason=%s", body.room_id, e)
-        raise HTTPException(status_code=400, detail=str(e))
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @app.post("/action")
@@ -162,7 +163,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             body.player_id,
             body.action,
         )
-        raise HTTPException(status_code=400, detail="Invalid action")
+        return JSONResponse(status_code=400, content={"error": "Invalid action"})
     # Log game_over events emitted by logic
     for event in result.get("events", []):
         if event.get("type") == "game_over":
