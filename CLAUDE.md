@@ -10,6 +10,28 @@ uv run ruff check .                            # линтинг
 uv run ruff format .                           # форматирование
 ```
 
+## Git Hooks
+
+Проект использует кастомные githooks из `.githooks/`. **Обязательно** включи их перед началом работы:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+### pre-commit
+- `ruff check .` — линтинг
+- `ty check .` — type checking
+
+### pre-push
+- `pytest` с coverage (≥75%)
+- `pip-audit` — аудит зависимостей
+
+**Все агенты обязаны включить githooks (`git config core.hooksPath .githooks`) при первом checkout.**
+
+## CI
+
+`.github/workflows/ci.yml`: lint → typecheck → audit → test (coverage ≥75%, diff-cover ≥80% на PR) → trigger e2e при merge в main.
+
 ## Архитектура
 
 ```

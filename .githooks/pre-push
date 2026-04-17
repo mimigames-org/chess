@@ -1,0 +1,13 @@
+#!/bin/sh
+# pre-push: pytest with coverage + pip-audit
+set -e
+
+REPO_NAME=$(basename "$PWD")
+
+echo "==> [$REPO_NAME] pytest (coverage >= 75%)"
+uv run pytest --cov --cov-fail-under=75
+
+echo "==> [$REPO_NAME] pip-audit"
+uv run pip-audit
+
+echo "==> pre-push passed"
