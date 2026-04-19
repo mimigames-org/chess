@@ -140,7 +140,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
     move_from = body.payload.get("from", "")
     move_to = body.payload.get("to", "")
     if move_from and move_to:
-        logger.info(
+        logger.debug(
             "player_action room_id=%s player_id=%s action=%s from=%s to=%s",
             body.room_id,
             body.player_id,
@@ -149,7 +149,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             move_to,
         )
     else:
-        logger.info(
+        logger.debug(
             "player_action room_id=%s player_id=%s action=%s",
             body.room_id,
             body.player_id,
