@@ -88,16 +88,21 @@ def _auth(x_mimi_secret: str, remote_addr: str = "") -> None:
 # --- Pydantic schemas ---
 
 
+class PlayerInfo(BaseModel):
+    id: str
+    name: str
+
+
 class StartRequest(BaseModel):
     room_id: str
-    players: list[dict]
+    players: list[PlayerInfo]
     config: dict = {}
 
 
 class ActionRequest(BaseModel):
     room_id: str
     player_id: str
-    action: str
+    action: logic.ChessAction
     payload: dict = {}
     state: dict
 
@@ -124,7 +129,7 @@ async def health():
 async def start(body: StartRequest, request: Request, x_mimi_secret: str = Header(...)):
     _auth(x_mimi_secret, request.client.host if request.client else "")
     try:
-        result = logic.start_game(body.players)
+        result = logic.start_game([p.model_dump() for p in body.players])
         logger.info("game_started room_id=%s players=%d", body.room_id, len(body.players))
         return result
     except ValueError as e:
