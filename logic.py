@@ -88,8 +88,9 @@ def start_game(players: list[dict[str, Any]]) -> dict[str, Any]:
 def handle_action(
     state: dict[str, Any],
     player_id: str,
-    action: ChessAction,
+    action: str,
     payload: dict[str, Any],
+    room_id: str = "",
 ) -> dict[str, Any] | None:
     """Process a game action. Returns None to signal a 400 response."""
     if action == "player_disconnected":
@@ -125,7 +126,7 @@ def handle_action(
         return None
 
     if move not in board.legal_moves:
-        logger.warning("illegal_move room_id=%s move=%s%s", state["room_id"], from_sq, to_sq)
+        logger.warning("illegal_move room_id=%s move=%s%s", room_id, from_sq, to_sq)
         return None
 
     old_board = board.copy()
@@ -152,7 +153,7 @@ def handle_action(
             winner = "white" if board.turn == chess.BLACK else "black"
         else:
             winner = "draw"
-        logger.info("game_over room_id=%s result=%s winner=%s", state["room_id"], new_status, winner)
+        logger.info("game_over room_id=%s result=%s winner=%s", room_id, new_status, winner)
         response["events"].append({"type": "game_over", "payload": {"winner": winner, "reason": new_status}})
 
     return response

@@ -102,7 +102,7 @@ class StartRequest(BaseModel):
 class ActionRequest(BaseModel):
     room_id: str
     player_id: str
-    action: logic.ChessAction
+    action: str
     payload: dict = {}
     state: dict
 
@@ -158,7 +158,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             body.player_id,
             body.action,
         )
-    result = logic.handle_action(body.state, body.player_id, body.action, body.payload)
+    result = logic.handle_action(body.state, body.player_id, body.action, body.payload, body.room_id)
     if result is None:
         logger.warning(
             "game_error room_id=%s reason=invalid_action player_id=%s action=%s",
