@@ -32,6 +32,7 @@ PORT = int(os.getenv("PORT", "8081"))
 
 async def _register_self() -> None:
     if not CORE_URL or not SELF_BACKEND_URL or not SELF_FRONTEND_URL:
+        logger.warning("auto-registration skipped: CORE_URL, SELF_BACKEND_URL, SELF_FRONTEND_URL must all be set")
         return
     payload = {
         "name": SELF_NAME,
