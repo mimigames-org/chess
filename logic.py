@@ -1,9 +1,11 @@
 """Chess game logic — pure functions, no external dependencies."""
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import chess
+
+ChessAction = Literal["player_disconnected", "set_host", "move"]
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +55,8 @@ def _public_snapshot(board: chess.Board, state: dict[str, Any]) -> dict[str, Any
         "status": _status(board),
         "white_player": state["white"],
         "black_player": state["black"],
-        "white_name": state.get("white_name", "Белые"),
-        "black_name": state.get("black_name", "Чёрные"),
+        "white_name": state["white_name"],
+        "black_name": state["black_name"],
     }
 
 
@@ -71,8 +73,8 @@ def start_game(players: list[dict[str, Any]]) -> dict[str, Any]:
         "fen": board.fen(),
         "white": white_id,
         "black": black_id,
-        "white_name": players[0].get("name", "Белые"),
-        "black_name": players[1].get("name", "Чёрные"),
+        "white_name": players[0]["name"],
+        "black_name": players[1]["name"],
     }
 
     return {
@@ -88,23 +90,22 @@ def handle_action(
     player_id: str,
     action: str,
     payload: dict[str, Any],
+    room_id: str = "",
 ) -> dict[str, Any] | None:
     """Process a game action. Returns None to signal a 400 response."""
     if action == "player_disconnected":
         return {"state": state, "public_delta": {}, "private_deltas": {}, "events": []}
     if action == "set_host":
-        new_host = payload.get("new_host_id", "")
-        new_state = {**state, "host_id": new_host} if new_host else state
+        new_host = payload["new_host_id"]
+        new_state = {**state, "host_id": new_host}
         return {"state": new_state, "public_delta": {}, "private_deltas": {}, "events": []}
     if action != "move":
         return None
 
     board = chess.Board(state["fen"])
 
-    from_sq = payload.get("from", "")
-    to_sq = payload.get("to", "")
-    if not from_sq or not to_sq:
-        return None
+    from_sq = payload["from"]
+    to_sq = payload["to"]
 
     if board.turn == chess.WHITE and player_id != state["white"]:
         return None
@@ -117,13 +118,14 @@ def handle_action(
         promotion = None
         if board.piece_type_at(from_int) == chess.PAWN and chess.square_rank(to_int) in (0, 7):
             promo_map = {"q": chess.QUEEN, "r": chess.ROOK, "b": chess.BISHOP, "n": chess.KNIGHT}
+            # promotion is optional; "q" is the correct chess default when not specified
             promotion = promo_map.get(str(payload.get("promotion", "q")).lower(), chess.QUEEN)
         move = chess.Move(from_int, to_int, promotion=promotion)
     except (ValueError, chess.InvalidMoveError):
+        # invalid move is expected input, not a programming error
         return None
 
     if move not in board.legal_moves:
-        room_id = state.get("room_id", "unknown")
         logger.warning("illegal_move room_id=%s move=%s%s", room_id, from_sq, to_sq)
         return None
 
@@ -151,7 +153,6 @@ def handle_action(
             winner = "white" if board.turn == chess.BLACK else "black"
         else:
             winner = "draw"
-        room_id = state.get("room_id", "unknown")
         logger.info("game_over room_id=%s result=%s winner=%s", room_id, new_status, winner)
         response["events"].append({"type": "game_over", "payload": {"winner": winner, "reason": new_status}})
 
