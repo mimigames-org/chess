@@ -22,7 +22,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-MIMI_SECRET = os.getenv("MIMI_SECRET", "dev-mimi-secret")
+MIMI_SECRET = os.environ["MIMI_SECRET"]
 CORE_URL = os.getenv("CORE_URL", "").rstrip("/")
 SELF_BACKEND_URL = os.getenv("SELF_BACKEND_URL", "").rstrip("/")
 SELF_FRONTEND_URL = os.getenv("SELF_FRONTEND_URL", "")

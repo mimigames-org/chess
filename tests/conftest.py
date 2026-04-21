@@ -1,5 +1,9 @@
+import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+os.environ.setdefault("MIMI_SECRET", "dev-mimi-secret")
 
 
 @pytest.fixture
