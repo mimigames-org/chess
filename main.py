@@ -23,17 +23,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 MIMI_SECRET = os.environ["MIMI_SECRET"]
-CORE_URL = os.getenv("CORE_URL", "").rstrip("/")
-SELF_BACKEND_URL = os.getenv("SELF_BACKEND_URL", "").rstrip("/")
-SELF_FRONTEND_URL = os.getenv("SELF_FRONTEND_URL", "")
-SELF_NAME = os.getenv("SELF_NAME", "Шахматы")
-PORT = int(os.getenv("PORT", "8081"))
+CORE_URL = os.environ["CORE_URL"].rstrip("/")
+SELF_BACKEND_URL = os.environ["SELF_BACKEND_URL"].rstrip("/")
+SELF_FRONTEND_URL = os.environ["SELF_FRONTEND_URL"]
+SELF_NAME = os.environ["SELF_NAME"]
+PORT = int(os.environ["PORT"])
 
 
 async def _register_self() -> None:
-    if not CORE_URL or not SELF_BACKEND_URL or not SELF_FRONTEND_URL:
-        logger.warning("auto-registration skipped: CORE_URL, SELF_BACKEND_URL, SELF_FRONTEND_URL must all be set")
-        return
     payload = {
         "name": SELF_NAME,
         "backend_url": SELF_BACKEND_URL,
@@ -47,7 +44,7 @@ async def _register_self() -> None:
                 resp.raise_for_status()
             logger.info("registered game=%s core_url=%s", SELF_NAME, CORE_URL)
             return
-        except Exception as e:
+        except Exception as e:  # broad catch intentional: retry loop over transient network errors
             logger.warning("registration_failed reason=%s retrying_in=5s", e)
             await asyncio.sleep(5)
 
