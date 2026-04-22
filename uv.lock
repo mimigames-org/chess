@@ -650,8 +650,8 @@ dev = [
 
 [[package]]
 name = "mimigames-sdk"
-version = "0.1.0"
-source = { git = "https://github.com/mimigames-org/sdk.git?subdirectory=python&rev=sdk-python#2bb60b7bd7b6808096997395bab8627c6c913a48" }
+version = "0.2.0"
+source = { git = "https://github.com/mimigames-org/sdk.git?subdirectory=python&rev=sdk-python#30fac9966108742a03cb793f4447b4f740fefe10" }
 dependencies = [
     { name = "pydantic" },
 ]
