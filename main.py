@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from mimigames_sdk.protocol import ActionRequest, HealthResponse, StartRequest, TickRequest, ViewRequest
+from pydantic import BaseModel, ConfigDict, Field
 
 import logic
 
@@ -31,7 +32,17 @@ SELF_NAME = os.environ["SELF_NAME"]
 PORT = int(os.environ["PORT"])
 
 
-async def _register_self() -> None:
+class ChessMovePayload(BaseModel):
+    """Required fields for a chess move action."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_: str = Field(alias="from")
+    to: str
+    promotion: str | None = None  # optional; "q" is the chess default when pawn promotes
+
+
+async def _register_self(client: httpx.AsyncClient) -> None:
     payload = {
         "name": SELF_NAME,
         "backend_url": SELF_BACKEND_URL,
@@ -40,9 +51,8 @@ async def _register_self() -> None:
     }
     while True:
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.post(f"{CORE_URL}/games", json=payload)
-                resp.raise_for_status()
+            resp = await client.post(f"{CORE_URL}/games", json=payload, timeout=5.0)
+            resp.raise_for_status()
             logger.info("registered game=%s core_url=%s", SELF_NAME, CORE_URL)
             return
         except (TimeoutError, httpx.HTTPError) as e:
@@ -55,8 +65,16 @@ async def _register_self() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup game=%s port=%d", SELF_NAME, PORT)
-    asyncio.create_task(_register_self())
+    http_client = httpx.AsyncClient()
+    register_task = asyncio.create_task(_register_self(http_client))
     yield
+    if not register_task.done():
+        register_task.cancel()
+        try:
+            await register_task
+        except asyncio.CancelledError:
+            pass
+    await http_client.aclose()
     logger.info("shutdown game=%s", SELF_NAME)
 
 
@@ -130,16 +148,23 @@ async def start(body: StartRequest, request: Request, x_mimi_secret: str = Heade
 @app.post("/action")
 async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Header(...)):
     _auth(x_mimi_secret, request.client.host if request.client else "")
-    move_from = body.payload.get("from", "")
-    move_to = body.payload.get("to", "")
-    if move_from and move_to:
+    if body.state is None:
+        return JSONResponse(status_code=400, content={"error": "state is required", "code": "invalid_request"})
+    if body.action == logic.Action.MOVE:
+        try:
+            move = ChessMovePayload.model_validate(body.payload)
+        except Exception as exc:
+            return JSONResponse(
+                status_code=422,
+                content={"error": f"invalid move payload: {exc}", "code": "validation_error"},
+            )
         logger.info(
             "player_action room_id=%s player_id=%s action=%s from=%s to=%s",
             body.room_id,
             body.player_id,
             body.action,
-            move_from,
-            move_to,
+            move.from_,
+            move.to,
         )
     else:
         logger.info(
@@ -148,8 +173,6 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             body.player_id,
             body.action,
         )
-    if body.state is None:
-        return JSONResponse(status_code=400, content={"error": "state is required", "code": "invalid_request"})
     result = logic.handle_action(body.state, body.player_id, body.action, body.payload, body.room_id)
     if result is None:
         logger.warning(
@@ -159,16 +182,6 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             body.action,
         )
         return JSONResponse(status_code=400, content={"error": "Invalid action", "code": "invalid_action"})
-    # Log game_over events emitted by logic
-    for event in result.get("events", []):
-        if event.get("type") == "game_over":
-            ep = event.get("payload", {})
-            logger.info(
-                "game_over room_id=%s result=%s winner=%s",
-                body.room_id,
-                ep.get("reason", ""),
-                ep.get("winner", ""),
-            )
     return result
 
 
