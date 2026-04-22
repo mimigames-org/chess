@@ -11,7 +11,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from mimigames_sdk.protocol import ActionRequest, StartRequest, TickRequest, ViewRequest
+from mimigames_sdk.protocol import ActionRequest, HealthResponse, StartRequest, TickRequest, ViewRequest
 
 import logic
 
@@ -111,8 +111,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health() -> HealthResponse:
+    return HealthResponse()
 
 
 @app.post("/start")
