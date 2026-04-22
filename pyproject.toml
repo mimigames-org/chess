@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "redis[hiredis]>=5.2.0",
     "python-chess>=1.999",
+    "mimigames-sdk @ git+https://github.com/mimigames-org/sdk.git@sdk-python#subdirectory=python",
 ]
 
 [dependency-groups]
