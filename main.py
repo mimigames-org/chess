@@ -45,7 +45,9 @@ async def _register_self() -> None:
                 resp.raise_for_status()
             logger.info("registered game=%s core_url=%s", SELF_NAME, CORE_URL)
             return
-        except Exception as e:  # broad catch intentional: retry loop over transient network errors
+        except (TimeoutError, httpx.HTTPError) as e:
+            # Retry only on transient network/timeout errors; other exceptions
+            # (e.g. programming bugs, auth misconfig) must propagate.
             logger.warning("registration_failed reason=%s retrying_in=5s", e)
             await asyncio.sleep(5)
 
@@ -131,7 +133,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
     move_from = body.payload.get("from", "")
     move_to = body.payload.get("to", "")
     if move_from and move_to:
-        logger.debug(
+        logger.info(
             "player_action room_id=%s player_id=%s action=%s from=%s to=%s",
             body.room_id,
             body.player_id,
@@ -140,7 +142,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             move_to,
         )
     else:
-        logger.debug(
+        logger.info(
             "player_action room_id=%s player_id=%s action=%s",
             body.room_id,
             body.player_id,
