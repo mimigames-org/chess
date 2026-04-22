@@ -8,9 +8,10 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from mimigames_sdk.protocol import ActionRequest, StartRequest, TickRequest, ViewRequest
 
 import logic
 
@@ -85,36 +86,23 @@ def _auth(x_mimi_secret: str, remote_addr: str = "") -> None:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-# --- Pydantic schemas ---
+# --- Exception handlers ---
 
 
-class PlayerInfo(BaseModel):
-    id: str
-    name: str
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.detail, "code": "http_error"},
+    )
 
 
-class StartRequest(BaseModel):
-    room_id: str
-    players: list[PlayerInfo]
-    config: dict = {}
-
-
-class ActionRequest(BaseModel):
-    room_id: str
-    player_id: str
-    action: str
-    payload: dict = {}
-    state: dict
-
-
-class TickRequest(BaseModel):
-    room_id: str
-
-
-class ViewRequest(BaseModel):
-    room_id: str
-    player_id: str
-    state: dict
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"error": str(exc), "code": "validation_error"},
+    )
 
 
 # --- Endpoints ---
@@ -134,7 +122,7 @@ async def start(body: StartRequest, request: Request, x_mimi_secret: str = Heade
         return result
     except ValueError as e:
         logger.warning("game_error room_id=%s reason=%s", body.room_id, e)
-        return JSONResponse(status_code=400, content={"error": str(e)})
+        return JSONResponse(status_code=400, content={"error": str(e), "code": "invalid_request"})
 
 
 @app.post("/action")
@@ -158,6 +146,8 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             body.player_id,
             body.action,
         )
+    if body.state is None:
+        return JSONResponse(status_code=400, content={"error": "state is required", "code": "invalid_request"})
     result = logic.handle_action(body.state, body.player_id, body.action, body.payload, body.room_id)
     if result is None:
         logger.warning(
@@ -166,7 +156,7 @@ async def action(body: ActionRequest, request: Request, x_mimi_secret: str = Hea
             body.player_id,
             body.action,
         )
-        return JSONResponse(status_code=400, content={"error": "Invalid action"})
+        return JSONResponse(status_code=400, content={"error": "Invalid action", "code": "invalid_action"})
     # Log game_over events emitted by logic
     for event in result.get("events", []):
         if event.get("type") == "game_over":
@@ -186,7 +176,19 @@ async def tick(body: TickRequest, request: Request, x_mimi_secret: str = Header(
     return None
 
 
+@app.get("/healthz/live")
+async def healthz_live() -> JSONResponse:
+    return JSONResponse(content={"status": "ok"})
+
+
+@app.get("/healthz/ready")
+async def healthz_ready() -> JSONResponse:
+    return JSONResponse(content={"status": "ok"})
+
+
 @app.post("/view")
 async def view(body: ViewRequest, request: Request, x_mimi_secret: str = Header(...)):
     _auth(x_mimi_secret, request.client.host if request.client else "")
+    if body.state is None:
+        return JSONResponse(status_code=400, content={"error": "state is required", "code": "invalid_request"})
     return logic.get_view(body.state, body.player_id)
