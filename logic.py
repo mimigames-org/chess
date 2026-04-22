@@ -1,11 +1,18 @@
 """Chess game logic — pure functions, no external dependencies."""
 
 import logging
+from enum import StrEnum
 from typing import Any, Literal
 
 import chess
 
 ChessAction = Literal["player_disconnected", "set_host", "move"]
+
+
+class Action(StrEnum):
+    PLAYER_DISCONNECTED = "player_disconnected"
+    SET_HOST = "set_host"
+    MOVE = "move"
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +100,13 @@ def handle_action(
     room_id: str = "",
 ) -> dict[str, Any] | None:
     """Process a game action. Returns None to signal a 400 response."""
-    if action == "player_disconnected":
+    if action == Action.PLAYER_DISCONNECTED:
         return {"state": state, "public_delta": {}, "private_deltas": {}, "events": []}
-    if action == "set_host":
+    if action == Action.SET_HOST:
         new_host = payload["new_host_id"]
         new_state = {**state, "host_id": new_host}
         return {"state": new_state, "public_delta": {}, "private_deltas": {}, "events": []}
-    if action != "move":
+    if action != Action.MOVE:
         return None
 
     board = chess.Board(state["fen"])
