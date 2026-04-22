@@ -12,6 +12,12 @@ services:
       SELF_NAME: ${SELF_NAME:-Шахматы}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/healthz/live || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     volumes:
       - .:/app
       - /app/.venv
