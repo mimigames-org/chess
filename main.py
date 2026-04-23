@@ -4,10 +4,11 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -84,7 +85,7 @@ app.mount("/ui", StaticFiles(directory="ui", html=True), name="ui")
 
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):  # type: ignore[return]
+async def log_requests(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     start = time.perf_counter()
     response = await call_next(request)
     latency_ms = (time.perf_counter() - start) * 1000
